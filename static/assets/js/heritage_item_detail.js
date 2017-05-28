@@ -1,9 +1,10 @@
  
- var heritageId;
+var heritageId;
+var annotations; 
 
  var myAnnotator = {
     "onSubmit": function(annotation) {
-        console.log(annotation);
+        
         var $element = $(annotation.highlights[0])
         var selected_motivation = $('#add-annotation-on-description-modal-select-motivation').val();
         var given_textual_body =  $("#add-annotation-on-description-modal-textarea").val();
@@ -38,18 +39,21 @@
             "data": JSON.stringify(data),
             "contentType": "application/json",
         }).always(function(response){
-            console.log($element); // TODO: id'yi kut diye bas
-            console.log(response);
+            $element.attr("data-annotation-id", response.id)
+            annotations.push(response);
+            renderAnnotationNumber(annotations.length);
         });
 
     }
  };
 
 
+function renderAnnotationNumber(n) {
+    $("#heritage-item-total-no-annotations").text(n);
+}
 
  $(function() {
     var annotator;
-    var annoations;
 
     function bind() {
         $('#heritage-item-description-read-more').click(function() {
@@ -89,6 +93,7 @@
         $('.annotator-adder button').attr( "data-keyboard", "false" );
 
         $('.annotator-adder button').click(function() {
+            $("#annotation-form-resource-type").val("text");
             $('.annotator-outer.annotator-editor').css('display','none');
             $('#add-annotation-on-description-modal-textarea').val("");
             $('#add-annotation-on-description-modal-url').val("");
@@ -100,23 +105,37 @@
 
          $('#annotate-description-modal-submit-text-but').click(function() {
              $("#add-annotation-on-description-modal-text-errors").html("&nbsp;");
+             var resourceType = $("#annotation-form-resource-type").val();
+
              // Checks if motivation selected
              var selected_motivation = $('#add-annotation-on-description-modal-select-motivation').val();
              var given_textual_body =  $("#add-annotation-on-description-modal-textarea").val();
              var given_url = $("#add-annotation-on-description-modal-url").val();
-             if (selected_motivation == "linking" && given_url == "") {
-                 // Give error since given URL cannot be empty string
-                 $("#add-annotation-on-description-modal-text-errors").html("Given URL cannot be empty string while selected motivation is 'linking'.");
-                 return
+
+             if (selected_motivation == "linking") {
+                if (given_url == "") {
+                    // Give error since given URL cannot be empty string
+                    $("#add-annotation-on-description-modal-text-errors").html("Given URL cannot be empty string while selected motivation is 'linking'.");
+                     return
+                }
             }
             else if (given_textual_body == "") {
                  // Give error since entered textual body cannot be empty string
                  $("#add-annotation-on-description-modal-text-errors").html("Textual body cannot be empty string while selected motivation is '" + selected_motivation + "'." );
                  return;
-             }
+            }
 
-            $('.annotator-save').click();
-            $('#add-annotation-on-description-modal-close-but').click();
+            if (resourceType == "text") {
+                $('.annotator-save').click();
+                $('#add-annotation-on-description-modal-close-but').click();
+            } else {
+                var targetId = $("#image-target-id").val();
+                submit_image_annotation_form(targetId, selected_motivation, given_textual_body, given_url, function(response){
+                    stop_image_annotation();
+                    show_image_annotations();
+                    $('#add-annotation-on-description-modal-close-but').click();
+                });
+            }
 
          });
 
@@ -174,30 +193,168 @@
              $('.annotator-cancel').click();
          });
 
+
+
          $('.annotator-hl').attr( "data-toggle", "modal" );
          $('.annotator-hl').attr( "data-target", "#display-annotations-on-highlighted-text-modal" );
+         var $allAnnotationsModalDescriptionAnnotations = $("#display-text-annotations-on-highlighted-text-tab");
+         var $templateDisplayTextAnnotation = $('#template-display-text-annotations-on-highlighted-text-tab').html();
          $('.annotator-hl').click(function() {
              $('#display-annotations-modal-highlighted-text').text('"' + $(this).text() + '"');
+             var selected_highlighted_text_id = parseInt($(this).attr("data-annotation-id").split("annotations/")[1]);
+             console.log(selected_highlighted_text_id);
+             var selected_highlighted_text_url = "/api/v1/heritages/" + heritageId + "/annotations/" + selected_highlighted_text_id;
+              $.getJSON(selected_highlighted_text_url)
+              .fail(function(xhr, status){
+                  toastr.error("annotation not found");
+              })
+              .done(function( response ) {
+                  console.log("annotation response for highlighted text");
+                  console.log(response);
+                  Mustache.parse($templateDisplayTextAnnotation);
+                  var rendered = Mustache.render($templateDisplayTextAnnotation, response);
+                  $allAnnotationsModalDescriptionAnnotations.html(rendered);
+              });
+
+
          });
 
 
+         $('#heritage-item-all-annotations').click(function() {
+             $('#all-annotations-on-heritage-item-modal-item-title').text($('#heritage-item-title').text());
+
+             var $allAnnotationsModalDescriptionAnnotations = $("#all-annotations-modal-description-tab");
+
+             var $template = $('#template-all-annotations-modal-description-tab').html();
+             Mustache.parse($template);
+             var rendered = Mustache.render($template, annotations);
+             $allAnnotationsModalDescriptionAnnotations.html(rendered);
+         });
+
+
+        $('.heritage-item-details-thumbnail-img-to-expand').click(function() {
+            init_image_popup($(this).children('img').attr('src'));
+        });
+
+        $("#btn-start-annotate").click(function(){
+            start_image_annotation();
+        })
+
+        $("#btn-cancel-annotate").click(function(){
+            stop_image_annotation();
+            show_image_annotations();
+        })
+
+        $("#btn-continue-annotate").click(function(){
+            show_image_annotation_form();
+        })
 
          $('#heritage-item-guide-but').click(function() {
              introJs().start();
          });
 
 
+    }
 
+    function init_image_popup(src) {
+        // $('#heritage-item-details-add-annotation-on-image-modal-target-image').attr( "src", );
+        $("#image-target-id").val(src);
+        v = VGG({
+          "single_region": false,
+          "url": src,
+          "canvas_container": document.getElementById("canvas_panel"),
+          "onLoaded": function(status) {
+            console.log(status);
+          },
+          "show_message": function(msg, t) {
+            console.log(msg)
+          },
+          "new_region_created": function(region) {
+            console.log(region)
+          },
+          "initialized": function(status) {
+            show_image_annotations();
+          }
+        });
+    }
 
-    // heritage-item-total-no-annotations
-    // heritage-item-title
-    // heritage-item-description
-    // heritage-item-owner
+    function start_image_annotation() {
+        $("#btn-start-annotate").hide();
+        $("#image-region-form").show();
+        v.clearRegions();
+    }
+    
+    function stop_image_annotation() {
+        $("#btn-start-annotate").show();
+        $("#image-region-form").hide();
+    }
+    
+    function show_image_annotation_form() {
+        $("#annotation-form-resource-type").val("image");
+    }
 
+    function show_image_annotations() {
+        
 
-        $('.heritage-item-details-thumbnail-img-to-expand').click(function() {
-             $('#heritage-item-details-add-annotation-on-image-modal-target-image').attr( "src", $( this ).children('img').attr('src') );
-         });
+        setTimeout(function(){
+
+            var regions = {};
+            var region_id = 0;
+            for (var i = annotations.length - 1; i >= 0; i--) {
+                var a = annotations[i];
+                if (a.target[0].type == "image") {
+                    var annotation_regions = JSON.parse(a.target[0].selector[0].value);
+                    for (var j = annotation_regions.length - 1; j >= 0; j--) {
+                        regions[region_id] = {"shape_attributes": annotation_regions[j], "region_attributes": {}};
+                        region_id++;
+                    }
+                }
+            }
+            v.setRegions([]);
+            console.log(regions);
+            v.import_region(regions);
+        }, 900);
+    }
+
+    function submit_image_annotation_form(targetId, selected_motivation, given_textual_body, given_url, callback) {
+        var regions = [];
+        for(var i = 0; i < v.getRegions().length; i++) {
+             regions.push(JSON.parse(v.map_to_json(v.getRegions()[i].shape_attributes)));
+        }
+        
+        var data = {
+            "@context": "http://www.w3.org/ns/anno.jsonld",
+            "type": "Annotation",
+            "creator": "osman",
+            "motivation": selected_motivation,
+            "body": [{
+                "type": "text",
+                "value": given_textual_body || given_url,
+                "format": "text/plain"
+            }],
+            "target": [{
+                "id": targetId,
+                "type": "image",
+                "format": "image/jpeg",
+                "selector": [{
+                    "type": "FragmentSelector",
+                    "conformsTo": "http://tools.ietf.org/rfc/rfc5147",
+                    "value": JSON.stringify(regions)
+                }]
+            }]
+        };
+        
+        $.ajax({
+            "url": "/api/v1/heritages/" + heritageId + "/annotations",
+            "method": "POST",
+            async: false,
+            "data": JSON.stringify(data),
+            "contentType": "application/json",
+        }).always(function(response){
+            callback(response);
+            annotations.push(response);
+            renderAnnotationNumber(annotations.length);
+        });
     }
 
     var $title = $("#heritage-item-title");
@@ -232,6 +389,8 @@
         var rendered = Mustache.render($template, images);
         $images.html(rendered);
 
+
+
         // LOCATION
         for (var i = heritage.multimedia.length - 1; i >= 0; i--) {
             var mm = heritage.multimedia[i];
@@ -255,23 +414,28 @@
         for (var i = annotations.length - 1; i >= 0; i--) {
             var a = annotations[i];
 
-            if (a.target[0].format == "text/plain") {
-                var position = a.target[0].selector[0].value.split("=")[1].split(",");
-                console.log(position);
-                annotator.annotator("loadAnnotations", [{
-                    "id": position[0], // TODO: duzgun bir id
-                    "ranges": [
-                        {
-                          "start": "",
-                          "end": "",
-                          "startOffset": position[0],
-                          "endOffset": position[1]
-                        }
-                      ]
-                }]);
 
-            }
+                if (a.target[0].format == "text/plain") {
+                    var position = a.target[0].selector[0].value.split("=")[1].split(",");
+                    
+                    annotator.annotator("loadAnnotations", [{
+                        "id": a.id, 
+                        "ranges": [
+                            {
+                              "start": "",
+                              "end": "",
+                              "startOffset": position[0],
+                              "endOffset": position[1]
+                            }
+                          ]
+                    }]);
+
+                }
+            
+
+
         }
+        renderAnnotationNumber(annotations.length);
     }
 
     function fetchAnnotations() {
@@ -283,9 +447,8 @@
             toastr.error("annotations not found");
         })
         .done(function( data ) {
-            annoations = data;
-            console.log("fetched annoations")
-            console.log(data);
+            annotations = data;
+            console.log("fetched annotations")
             renderAnnotations();
         });
     }
@@ -299,6 +462,7 @@
             toastr.error("heritage not found");
         })
         .done(function( data ) {
+            console.log(data);
             render(data);
             $("#content").show();
             fetchAnnotations();
@@ -312,5 +476,10 @@
         toastr.error("heritage item id not found in the url");
     else
         fetch(heritageId);
+
+
+    
+
+
 
  });
