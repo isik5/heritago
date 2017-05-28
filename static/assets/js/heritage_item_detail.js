@@ -14,7 +14,7 @@ var annotations;
         var data = {
             "@context": "http://www.w3.org/ns/anno.jsonld",
             "type": "Annotation",
-            "creator": "osman",
+            "creator": "demouser",
             "motivation": $("#add-annotation-on-description-modal-select-motivation").val(),
             "body": [{
                 "type": "text",
@@ -197,7 +197,7 @@ function renderAnnotationNumber(n) {
 
          $('.annotator-hl').attr( "data-toggle", "modal" );
          $('.annotator-hl').attr( "data-target", "#display-annotations-on-highlighted-text-modal" );
-         var $allAnnotationsModalDescriptionAnnotations = $("#display-text-annotations-on-highlighted-text-tab");
+         var $displayDescriptionAnnotationModalDescriptionAnnotations = $("#display-text-annotations-on-highlighted-text-tab");
          var $templateDisplayTextAnnotation = $('#template-display-text-annotations-on-highlighted-text-tab').html();
          $('.annotator-hl').click(function() {
              $('#display-annotations-modal-highlighted-text').text('"' + $(this).text() + '"');
@@ -213,22 +213,29 @@ function renderAnnotationNumber(n) {
                   console.log(response);
                   Mustache.parse($templateDisplayTextAnnotation);
                   var rendered = Mustache.render($templateDisplayTextAnnotation, response);
-                  $allAnnotationsModalDescriptionAnnotations.html(rendered);
+                  $displayDescriptionAnnotationModalDescriptionAnnotations.html(rendered);
               });
 
 
          });
 
-
+         var $allAnnotationsModalDescriptionAnnotations = $("#all-annotations-modal-description-tab");
+         var $templateDisplayAllAnnotationsOnDescription = $('#template-all-annotations-modal-description-tab').html();
          $('#heritage-item-all-annotations').click(function() {
              $('#all-annotations-on-heritage-item-modal-item-title').text($('#heritage-item-title').text());
-
-             var $allAnnotationsModalDescriptionAnnotations = $("#all-annotations-modal-description-tab");
-
-             var $template = $('#template-all-annotations-modal-description-tab').html();
-             Mustache.parse($template);
-             var rendered = Mustache.render($template, annotations);
+             Mustache.parse($templateDisplayAllAnnotationsOnDescription);
+             var filteredAnnotations = filterAnnotations("text");
+             var rendered = Mustache.render($templateDisplayAllAnnotationsOnDescription, filteredAnnotations);
              $allAnnotationsModalDescriptionAnnotations.html(rendered);
+         });
+
+        var $allAnnotationsModalImageAnnotations = $("#all-annotations-modal-image-tab");
+        var $templateDisplayAllAnnotationsOnImage = $('#template-all-annotations-modal-image-tab').html();
+        $('#all-annotations-modal-image-tab-button').click(function() {
+             Mustache.parse($templateDisplayAllAnnotationsOnImage);
+             var filteredAnnotations = filterAnnotations("image");
+             var rendered = Mustache.render($templateDisplayAllAnnotationsOnImage, filteredAnnotations);
+             $allAnnotationsModalImageAnnotations.html(rendered);
          });
 
 
@@ -256,6 +263,20 @@ function renderAnnotationNumber(n) {
 
     }
 
+    function filterAnnotations(type) {
+       var filteredAnnotationsList = [];
+          for(var i = 0; i < annotations.length; i++){
+            if (annotations[i].target[0].type == type) {
+               filteredAnnotationsList.push(annotations[i]);
+            }
+        }
+        console.log(filteredAnnotationsList);
+        return filteredAnnotationsList;
+
+    }
+
+    var $imageExpandedModalImageAnnotations = $("#heritage-item-details-add-annotation-on-image-annotations");
+    var $templateDisplayImageAnnotationOnExpandedModal = $('#template-heritage-item-details-add-annotation-on-image-annotations').html();
     function init_image_popup(src) {
         // $('#heritage-item-details-add-annotation-on-image-modal-target-image').attr( "src", );
         $("#image-target-id").val(src);
@@ -264,10 +285,10 @@ function renderAnnotationNumber(n) {
           "url": src,
           "canvas_container": document.getElementById("canvas_panel"),
           "onLoaded": function(status) {
-            console.log(status);
+            
           },
           "show_message": function(msg, t) {
-            console.log(msg)
+            
           },
           "new_region_created": function(region) {
             console.log(region)
@@ -313,7 +334,7 @@ function renderAnnotationNumber(n) {
             v.setRegions([]);
             console.log(regions);
             v.import_region(regions);
-        }, 900);
+        }, 400);
     }
 
     function submit_image_annotation_form(targetId, selected_motivation, given_textual_body, given_url, callback) {
@@ -321,11 +342,11 @@ function renderAnnotationNumber(n) {
         for(var i = 0; i < v.getRegions().length; i++) {
              regions.push(JSON.parse(v.map_to_json(v.getRegions()[i].shape_attributes)));
         }
-        
+
         var data = {
             "@context": "http://www.w3.org/ns/anno.jsonld",
             "type": "Annotation",
-            "creator": "osman",
+            "creator": "demouser",
             "motivation": selected_motivation,
             "body": [{
                 "type": "text",
@@ -362,10 +383,17 @@ function renderAnnotationNumber(n) {
     var $basicInformation = $("#basic-information");
     var $origin = $("#heritage-origin");
     var $images = $("#heritage-images");
+    var $startDate = $("#heritage-item-start-date");
+    var $endDate = $("#heritage-item-end-date");
+    var $exactDate = $("#heritage-item-exact-date");
 
     function render(heritage) {
         $title.html(heritage.title);
         $description.html(heritage.description);
+        console.log(heritage);
+        $startDate.html(heritage.startDate);
+        $endDate.html(heritage.endDate);
+        $exactDate.html(heritage.exactDate);
         var $basicInformationTemplate = $("template-basic-information")
 
         var $template = $('#template-basic-information').html();

@@ -1,7 +1,8 @@
+import django.dispatch
 from rest_framework import serializers
 
 from heritages.models import Heritage, BasicInformation, Origin, Tag, Multimedia, Selector, AnnotationTarget, \
-    AnnotationBody, Annotation
+    AnnotationBody, Annotation, User
 
 
 class BasicInformationSerializer(serializers.ModelSerializer):
@@ -48,7 +49,11 @@ class MultimediaSerializer(serializers.ModelSerializer):
             multimedia.url = "/heritages/{}/{}/{}.png".format(
                 multimedia.heritage.id, multimedia.type, multimedia.id)
         multimedia.save()
+        heritage_created.send(sender=HeritageSerializer, instance=multimedia.heritage)
         return multimedia
+
+
+heritage_created = django.dispatch.Signal(providing_args=["instance"])
 
 
 class HeritageSerializer(serializers.ModelSerializer):
@@ -94,6 +99,7 @@ class HeritageSerializer(serializers.ModelSerializer):
             if not heritage_tags:
                 heritage.tags.add(*Tag.objects.get_or_create(**entry))
 
+        heritage_created.send(sender=self.__class__, instance=heritage)
         return heritage
 
 
@@ -180,3 +186,28 @@ class AnnotationSerializer(serializers.ModelSerializer):
                                         value=data["value"])
 
         return annotation
+
+
+class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ("id", "first_name", "last_name", "username",
+                  "email", "password")
+        read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        password = validated_data["password"]
+        user = User.objects.create(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        instance.email = validated_data["email"]
+        instance.first_name = validated_data["first_name"]
+        instance.last_name = validated_data["last_name"]
+        instance.set_password(validated_data["password"])
+        instance.save()
+        return instance
